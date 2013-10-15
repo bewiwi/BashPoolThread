@@ -62,6 +62,11 @@ do
             color=always
             shift
             ;;
+        --test|-t)
+            shift
+            testToExecute=$1    
+            shift
+            ;;
         -)
             echo >&2 "roundup: unknown switch $1"
             exit 1
@@ -239,6 +244,10 @@ do
 
         for roundup_test_name in $roundup_plan
         do
+            if [ ! -z $testToExecute ]
+            then
+                [ $testToExecute != $roundup_test_name ] && continue
+            fi
             # Any number of things are possible in `before`, `after`, and the
             # test.  Drop into an subshell to contain operations that may throw
             # off roundup; such as `cd`.
