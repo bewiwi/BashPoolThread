@@ -2,40 +2,156 @@
 #Dépendance
 #grep awk sort
 
+declare -r BTworkFolder=/dev/shm/
+declare -r BTsleepLoop=0.4
+declare -r Uid="$(id -u)" 
+
 declare -A BashThreadPoolNumber
 declare -A BashThreadPoolPID
 declare -A BashThreadPoolCommand
 
-BTsleepLoop=0.4
-
 ###### SYS Function #####
 
-#$1 : array
-#$2 : name
-function __getLastIndex()
+#$1 : poolname
+function __getPoolFile()
 {
-    array=$1
-    name=$2
-    index=${!array[@]} | grep "^$name," | awk -F',' 'END {print $2}'
-    [ -z $index ] && index=0
-    echo -n $index
+    local name=$1
+    echo "$BTworkFolder/${Uid}-$name"
+}
+
+#$1 : file
+function __checkFile()
+{
+    local file=$1
+    if [ ! -e $file ];then
+        echo "File not exist : $file" >&2
+        return 1
+    fi
+    if [ ! -w $file ];then
+        echo "File not writable : $file" >&2
+        return 1
+    fi
+
+    i=0
+    while read line
+    do
+        (( i++ ))
+        #First line 
+       if [[ $i = 0  ]] && [ $line =~ ^#[0-9][0-9 ]*:[0-9]*$ ]
+       then
+            echo "Invalid First line" >&2
+            return 1
+       fi
+    done < $file
+}
+
+#$1 : name
+function __getPoolNumberOfThread()
+{
+    local name=$1
+    local file="$(__getPoolFile $name)"
+    local number=$(sed q "$file" | sed -e 's/^#\([0-9]*\):.*$/\1/g' )
+    echo $number
+}
+
+#$1 : name
+function __getPoolPids()
+{
+    local name=$1
+    local file="$(__getPoolFile $name)"
+    echo $(sed 1d "$file" | sed 's/:.*$//g' )
+}
+
+#$1 : name
+#$2 : pid
+function __removePoolPid()
+{
+    local name=$1
+    local PID=$2
+    local file="$(__getPoolFile $name)"
+    sed -i "/^$PID:.*$/d" "$file"
+}
+
+#$1 : name
+#$2 : PID
+#$3 : command
+function __setPidToCommand()
+{
+    local name=$1
+    local PID=$2
+    local command="$3"
+    local file="$(__getPoolFile $name)"
+    local escapedCommand="`echo $command | sed -e 's/[]\/()$*.^|[]/\\\\&/g'`"
+    sed -i "s/^:$escapedCommand$/$PID&/" "$file" 
+
 }
 
 #$1 : name
 function __countAndCheckPID()
 {
-    name=$1
-    i=0
-    NewPoolId=""
-    for PID in ${BashThreadPoolPID[$name]}
+    local name=$1
+    local i=0
+    local NewPoolId=""
+    for PID in $(__getPoolPids $name)
     do
-        if [ -d /proc/$PID  ] ; then
-            NewPoolId="$NewPoolId $PID"
-            (( i++ ))
+        if [ ! -d /proc/$PID  ] ; then
+            __removePoolPid $name $PID
+            continue
         fi
+        (( i++ ))
     done
-    BashThreadPoolPID[$name]=$NewPoolId
     echo $i
+}
+
+
+#$1 : name
+function __getNextPoolCommand()
+{
+    local name=$1
+    local file="$(__getPoolFile $name)"
+    local ret=$( sed  1d "$file")
+    ret=$(echo "$ret" | sed '/^[0-9][0-9]*:/d')
+    ret=$(echo "$ret" | sed 's/^://g') 
+    echo "$ret" | sed q
+}
+
+#$1 : name
+function __startPool()
+{
+    local name=$1
+    local NumberMax=$(__getPoolNumberOfThread $name)
+    
+    __setPidToPool "$name" "$$"
+    while [ -f "$( __getPoolFile $name )" ]
+    do
+        command="$( __getNextPoolCommand $name)" 
+        if [ -z "$command" ];then
+            sleep $BTsleepLoop
+            continue
+        fi
+        bash -c "$command" &
+        PID=$!
+        __setPidToCommand "$name" "$PID" "$command"
+        NUM=$(__countAndCheckPID $name)
+        
+        #loop wainting a new sloot
+        while [ "$NUM" -ge "$NumberMax" ]
+        do
+            NUM=$(__countAndCheckPID $name)
+            sleep $BTsleepLoop 
+        done
+    done
+
+}
+
+#$1 : name
+#$2 : pid
+function __setPidToPool()
+{
+    local name=$1
+    local PID=$2
+    local file="$(__getPoolFile $name)"
+    sed -i "s/^#[0-9][0-9]*:/&$PID/" "$file" 
 }
 
 ##### User Function #####
@@ -45,8 +161,7 @@ function __countAndCheckPID()
 #$2 numberofThread
 function BTpoolNew()
 {
-    name=$1
-
+    local name=$1
 
     if [[ ! -z $2 && $2 =~ ^[0-9]*$ ]];then
         true
@@ -59,33 +174,26 @@ function BTpoolNew()
         echo "Only Alphanumeric Char allowed : $name" >&2
         return 1
     fi
+    
+    #TODO Check File exist
 
-    numberofThread=$2
-    BashThreadPoolNumber[$name]=$numberofThread
-    BashThreadPoolPID[$name]=''
+    local numberofThread=$2
+    echo "#$numberofThread:" > "$(__getPoolFile $name)"
 }
 
 #$1 nameofpool
 function BTpoolRemove()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
-    unset BashThreadPoolNumber[$name]
-    for index in  "${!BashThreadPoolCommand[@]}"
-    do
-        echo $index | grep "^$name," || continue
-        unset BashThreadPoolCommand[$index]
-    done
-
-    unset BashThreadPoolPID[$name]
-
-
+    rm -f "$(__getPoolFile $name)"
 }
 
 #$1 nameofpool
 function BTpoolExist()
 {
-    if [  -z "${BashThreadPoolNumber[$1]}" ]
+    local name=$1
+    if [ ! -w "$(__getPoolFile $name)" ]
     then
         echo "Pool Doesn't exist" >&2
         return 1
@@ -95,9 +203,9 @@ function BTpoolExist()
 
 function BTpoolList()
 {
-    for name in "${!BashThreadPoolNumber[@]}"
+    for file in "$(__getPoolFile)"*
     do
-        echo "$name "${BashThreadPoolNumber[$name]}
+        echo "$file"
     done
 }
 
@@ -105,65 +213,50 @@ function BTpoolList()
 #$@ command 
 function BTcommandAdd()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
     shift
-    index=$(__getLastIndex $BashThreadPoolCommand $name)
-    (( index++ )) || true
-    BashThreadPoolCommand[$name,$index]="$@"
+    __checkFile "$(__getPoolFile $name)" || return 1
+    echo ":$@" >> $(__getPoolFile $name )
 }
 
 #$1 poolname
 function BTcommandList()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
 
-    ret="" 
-    for index in  "${!BashThreadPoolCommand[@]}"
+    local ret="" 
+    local i=-1
+    while read line
     do
-        echo $index | grep "^$name," > /dev/null 2>&1 || continue
-        id=$(echo $index | sed "s/^$name,//g")
-        ret+="$id  ${BashThreadPoolCommand[$index]}\n"
-    done
+        (( i++ )) || true
+        [ $i = 0 ] && continue
+        command=$( echo $line | sed 's/^[0-9]*://g') 
+        ret+="$i $command\n"
+    done < "$(__getPoolFile $name)"
     echo -e -n "$ret"
 }
 
 #$1 poolname
 function BTpoolStart()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
-   
-    ret="" 
-    for index in  "${!BashThreadPoolCommand[@]}"
-    do
-        command="${BashThreadPoolCommand[$index]}"
-        bash -c "$command" &
-        PID=$!
-        BashThreadPoolPID[$name]="${BashThreadPoolPID[$name]} $PID"
-
-        NUM=$(__countAndCheckPID $name)
-        
-        #loop wainting a new sloot
-        while [ $NUM -ge ${BashThreadPoolNumber[$name]} ]
-        do
-            NUM=$(__countAndCheckPID $name)
-            sleep $BTsleepLoop 
-        done
-    done
+    __startPool $name &  
 }
 
 #$1 : poolname
 function BTpoolWait()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
 
     #Wait the last thread
-    for PID in ${BashThreadPoolPID[$name]}
+    while true
     do
-        wait $PID || true
+        [ $(__countAndCheckPID $name) = 0 ] && break
+        sleep $BTsleepLoop
     done
 }
 
@@ -171,14 +264,8 @@ function BTpoolWait()
 #$1 : poolname
 function BTpoolStop()
 {
-    name=$1
+    local name=$1
     BTpoolExist $name || return 1
+    rm $(__getPoolFile $name)
     
-    for PID in  ${BashThreadPoolPID[$name]}
-    do
-        kill $PID || true
-        [ -d /proc/$PID  ] && continue
-        sleep 1
-        [ -d /proc/$PID  ] ||  kill -9 $PID
-    done
 }

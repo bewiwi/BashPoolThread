@@ -1,4 +1,10 @@
-describe "BT test"
+describe "BT integration test"
+
+before()
+{
+    source ./BT.sh
+    rm -f "$(__getPoolFile)"*
+}
 
 it_test_add_and_list()
 {
@@ -65,7 +71,6 @@ it_test_a_simple_command()
 
     BTpoolNew test 2
     BTcommandAdd test touch $file
-
     BTpoolStart test
     BTpoolWait test
     test -f $file
@@ -98,7 +103,7 @@ it_test_multiple_command()
     test  -f ${file}5
 }
 
-it_test_mulltiple_command2()
+it_test_multiple_command2()
 {
     source ./BT.sh
 
@@ -117,6 +122,6 @@ it_test_mulltiple_command2()
 
     test  -f ${file}
 
-    test $(cat $file | sort | tr -d '\n') = "12345"
+    test "$(cat $file | sort | tr -d '\n')" = "12345"
 
 }
