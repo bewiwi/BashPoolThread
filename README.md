@@ -32,11 +32,35 @@ BTpoolWait poolname
 BTpoolList
 > List all pool created
 
+BTpoolRemove poolname
+> Remove pool 'poolname'
+
 BTcommandAdd poolname command
 > Add a new command in 'poolname'
 
 BTcommandList poolname
 > List all command of pool 'poolname'
+
+### Example
+```bash
+source BT.sh
+
+##Create a pool with 2 worker
+BTpoolNew test 2
+
+#Start pool
+BTpoolStart test
+>[1] 12643
+
+for i in $(seq 1 5) ; do BTcommandAdd test touch /tmp/$i; done
+
+ls /tmp
+>1  2  3  4  5
+
+BTpoolStop test
+BTpoolRemove test
+
+```
 
 ### How it works ?
 BT.sh needs one file for any pool and juste modify this file to control the pool.
