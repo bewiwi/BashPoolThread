@@ -3,7 +3,7 @@ BashPoolThread
 BashPoolThread is a little script which provides some functions to control pools of background command
 
 ### Installation
-No installation is needed just download BT.sh or clone git repo and source the script to access to the function
+No installation is needed just download BT.sh or clone git repo and source the script to access to the function or exec the script to access with your command line
 
 ```
 source ./BT.sh
@@ -12,10 +12,10 @@ source ./BT.sh
 OR
 
 ```
-. ./BT.sh
+./BT.sh
 ```
 
-### Usage
+### Usage in a script ( source mode )
 BT.sh provides some public functions :
 BTpoolNew poolname number
 > Add a new pool with name 'poolname' and 'number' workers
@@ -40,6 +40,19 @@ BTcommandAdd poolname command
 
 BTcommandList poolname
 > List all command of pool 'poolname'
+
+### Usage in a terminal ( CLI mode )
+./BT.sh pool
+    new|n|add|a   poolname      : Add a new pool
+    remove|r|delete|d  poolname : Remove a pool
+    list|l                      : List pools
+    exist|e poolname            : Exitcode 0 if poolname exist
+    start poolname              : Start pool
+    stop poolname               : Stop pool
+    wait poolname               : Wait pool
+./BT.sh command
+    add|a poolname command      : Add a command to a pool
+    list|l poolname             : List command of a pool
 
 ### Example
 ```bash

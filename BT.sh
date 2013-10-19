@@ -4,11 +4,6 @@
 
 declare -r BTworkFolder=/dev/shm/
 declare -r BTsleepLoop=0.4
-declare -r Uid="$(id -u)" 
-
-declare -A BashThreadPoolNumber
-declare -A BashThreadPoolPID
-declare -A BashThreadPoolCommand
 
 ###### SYS Function #####
 
@@ -16,7 +11,7 @@ declare -A BashThreadPoolCommand
 function __getPoolFile()
 {
     local name=$1
-    echo "$BTworkFolder/${Uid}-$name"
+    echo "$BTworkFolder/BT$(id -u)-$name"
 }
 
 #$1 : file
@@ -205,7 +200,7 @@ function BTpoolList()
 {
     for file in "$(__getPoolFile)"*
     do
-        echo "$file"
+        echo "$(basename $file | sed "s/BT$(id -u)-//g" )"
     done
 }
 
@@ -243,7 +238,8 @@ function BTpoolStart()
 {
     local name=$1
     BTpoolExist $name || return 1
-    __startPool $name &  
+    #Daemonize
+    ( __startPool $name & )
 }
 
 #$1 : poolname
@@ -260,7 +256,6 @@ function BTpoolWait()
     done
 }
 
-
 #$1 : poolname
 function BTpoolStop()
 {
@@ -269,3 +264,79 @@ function BTpoolStop()
     rm $(__getPoolFile $name)
     
 }
+
+#Sourced
+[ $# = "0" ] && exit 0
+
+function help()
+{
+    cat <<EOF
+$0 pool
+    new|n|add|a   poolname      : Add a new pool
+    remove|r|delete|d  poolname : Remove a pool
+    list|l                      : List pools
+    exist|e poolname            : Exitcode 0 if poolname exist
+    start poolname              : Start pool
+    stop poolname               : Stop pool
+    wait poolname               : Wait pool
+$0 command
+    add|a poolname command      : Add a command to a pool
+    list|l poolname             : List command of a pool
+EOF
+}
+
+case "$1" in
+    pool|p)
+        shift
+        arg=$1
+        shift
+        case "$arg" in
+            new|n|add|a)
+                BTpoolNew $@ 
+                ;;
+            remove|r|delete|d)
+                BTpoolRemove $@
+                ;;
+            list|l)
+                BTpoolList $@
+                ;;
+            exist|e)
+                BTpoolExist $@
+                ;;
+            start)
+                BTpoolStart $@
+                ;;
+            stop)
+                BTpoolStop $@
+                ;;
+            wait|w)
+                BTpoolWait $@
+                ;;
+            *)
+                help
+                exit 1
+                ;;
+        esac
+        ;;
+    command|c)
+        shift
+        arg=$1
+        shift
+        case "$arg" in
+            add|a)
+                BTcommandAdd $@
+                ;;
+            list|l)
+                BTcommandList $@
+                ;;
+            *)
+                help
+                exit 1
+                ;;
+        esac
+        ;;
+    *)
+        help
+        exit 1
+        ;;
+esac
