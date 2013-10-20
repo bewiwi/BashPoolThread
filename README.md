@@ -42,6 +42,8 @@ BTcommandList poolname
 > List all command of pool 'poolname'
 
 ### Usage in a terminal ( CLI mode )
+
+```
 ./BT.sh pool
     new|n|add|a   poolname      : Add a new pool
     remove|r|delete|d  poolname : Remove a pool
@@ -53,6 +55,7 @@ BTcommandList poolname
 ./BT.sh command
     add|a poolname command      : Add a command to a pool
     list|l poolname             : List command of a pool
+```
 
 ### Example
 ```bash
