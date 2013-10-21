@@ -2,7 +2,10 @@
 #Dépendance
 #grep awk sort
 
-declare -r BTworkFolder=/dev/shm/
+if [ -z $BTworkFolder ]
+then
+    declare -r BTworkFolder=/dev/shm/
+fi
 declare -r BTsleepLoop=0.4
 
 ###### SYS Function #####
