@@ -61,7 +61,7 @@ it_test_add_and_list_command()
     test $(BTcommandList test | wc -l) = 2 
 }
 
-it_test_a_simple_command()
+nit_test_a_simple_command()
 {
     source ./BT.sh
     file=/tmp/testBT
@@ -76,7 +76,7 @@ it_test_a_simple_command()
     test -f $file
 }
 
-it_test_multiple_command()
+nit_test_multiple_command()
 {
     source ./BT.sh
     file=/tmp/testBT
@@ -103,7 +103,7 @@ it_test_multiple_command()
     test  -f ${file}5
 }
 
-it_test_multiple_command2()
+nit_test_multiple_command2()
 {
     source ./BT.sh
 
