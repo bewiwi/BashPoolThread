@@ -84,7 +84,21 @@ it_test_setPidToComplexCommand()
     __createComplexFakePoolFile fake
     command="echo /tmp/prout |grep test | sed 's/\s*tesT/prou*-/' | ping"
     __setPidToCommand fake 51 "$command"
-    grep "^51:" $(__getPoolFile fake)
+    test $( grep "^51:" $(__getPoolFile fake) | wc -l ) = 1
+}
+
+it_test_setPidToComplexCommand2()
+{
+    source ./BT.sh
+    __createComplexFakePoolFile fake
+    file=$(__getPoolFile fake)
+    for i in $(seq 3 -1 1)
+    do
+        command="ping -c 1 ks$i.kimsufi.com 2>/dev/null | head -n 1| sed 's/.*com\ (\([0-9.]*\)).*/\1/g' >> ~/hack/kimsufi/ip.txt" 
+        echo -e ":$command" >> $file
+        __setPidToCommand fake $(( 51 + $i )) "$command"
+        test $( grep "^$(( 51 + $i )):" $(__getPoolFile fake)| wc -l ) = 1
+    done
 }
 
 it_test_setPidToPool()

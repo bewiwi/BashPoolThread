@@ -70,6 +70,12 @@ function __removePoolPid()
     sed -i "/^$PID:.*$/d" "$file"
 }
 
+#$@ : string to escape
+function __escapeSed()
+{
+    echo "$@" | sed -e 's/[]\/$*.^[]/\\&/g' 
+}
+
 #$1 : name
 #$2 : PID
 #$3 : command
@@ -79,8 +85,8 @@ function __setPidToCommand()
     local PID=$2
     local command="$3"
     local file="$(__getPoolFile $name)"
-    local escapedCommand="`echo $command | sed -e 's/[]\/()$*.^|[]/\\\\&/g'`"
-    sed -i "s/^:$escapedCommand$/$PID&/" "$file" 
+    local escapedCommand="$( __escapeSed "$command" )"
+    sed -i -e "s/^:${escapedCommand}$/$PID&/" "$file" 
 
 }
 
@@ -269,7 +275,8 @@ function BTpoolStop()
 }
 
 #Sourced
-[ $# = "0" ] && exit 0
+if [ $# != "0" ]
+then
 
 function help()
 {
@@ -343,3 +350,5 @@ case "$1" in
         exit 1
         ;;
 esac
+
+fi
